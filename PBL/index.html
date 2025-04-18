@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>안전 PBL - 보행자 사고 분석</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://unpkg.com/leaflet@1.9.3/dist/leaflet.css"
+    />
+  </head>
+  <body class="flex h-screen bg-gray-100">
+    <!-- 사이드바 -->
+    <aside class="w-64 bg-white shadow p-4 flex flex-col">
+      <h2 class="text-xl font-bold mb-4">필터</h2>
+      <label class="text-sm mb-2">기간 선택</label>
+      <input type="date" class="mb-2 p-1 border rounded" placeholder="시작일" />
+      <input type="date" class="mb-4 p-1 border rounded" placeholder="종료일" />
+      <label class="text-sm">행정구역</label>
+      <select class="mb-2 p-1 border rounded">
+        <option>시도 선택</option>
+      </select>
+      <select class="mb-4 p-1 border rounded">
+        <option>시군구 선택</option>
+      </select>
+      <h2 class="text-xl font-bold mt-6 mb-2">레이어</h2>
+      <div class="flex items-center mb-2">
+        <input type="checkbox" id="toggle-accidents" class="mr-2" checked />
+        <label for="toggle-accidents">사고 시각화</label>
+      </div>
+      <div class="flex items-center">
+        <input type="checkbox" id="toggle-lamps" class="mr-2" checked />
+        <label for="toggle-lamps">보행등 위치</label>
+      </div>
+    </aside>
+
+    <!-- 메인 콘텐츠 -->
+    <main class="flex-1 flex flex-col">
+      <!-- 헤더 -->
+      <header class="bg-white shadow p-4 flex justify-between items-center">
+        <h1 class="text-2xl font-bold">보행자 사고 분석 대시보드</h1>
+        <nav>
+          <button class="px-3 py-1 mr-2 hover:bg-gray-200 rounded">
+            대시보드
+          </button>
+          <button class="px-3 py-1 hover:bg-gray-200 rounded">챗봇</button>
+        </nav>
+      </header>
+
+      <!-- 본문 영역 -->
+      <section class="flex-1 grid grid-cols-2 gap-4 p-4">
+        <!-- 지도 영역 -->
+        <div
+          id="map"
+          class="col-span-2 md:col-span-1 bg-white rounded shadow"
+          style="height: 100%"
+        ></div>
+        <!-- 차트 영역 -->
+        <div
+          id="charts"
+          class="col-span-2 md:col-span-1 grid grid-rows-2 gap-4"
+        >
+          <canvas id="trendChart" class="bg-white rounded shadow p-2"></canvas>
+          <canvas
+            id="densityChart"
+            class="bg-white rounded shadow p-2"
+          ></canvas>
+        </div>
+      </section>
+    </main>
+
+    <!-- 챗봇 인터페이스 -->
+    <div
+      class="fixed bottom-4 right-4 w-80 bg-white shadow-lg rounded-lg flex flex-col"
+    >
+      <div
+        class="bg-blue-500 text-white p-2 rounded-t-lg flex justify-between items-center"
+      >
+        <span>안전 챗봇</span>
+        <button id="chat-close">✕</button>
+      </div>
+      <div
+        id="chat-window"
+        class="p-2 h-64 overflow-y-auto flex flex-col-reverse"
+      ></div>
+      <div class="p-2 border-t">
+        <input
+          id="chat-input"
+          type="text"
+          placeholder="질문을 입력하세요..."
+          class="w-full p-1 border rounded"
+        />
+      </div>
+    </div>
+
+    <!-- Leaflet & Chart.js scripts -->
+    <script src="https://unpkg.com/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- 초기화 스크립트(예시) -->
+    <script>
+      const map = L.map("map").setView([37.5665, 126.978], 11);
+      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+        attribution: "© OpenStreetMap contributors",
+      }).addTo(map);
+
+      const ctx1 = document.getElementById("trendChart").getContext("2d");
+      new Chart(ctx1, { type: "line", data: { labels: [], datasets: [] } });
+
+      const ctx2 = document.getElementById("densityChart").getContext("2d");
+      new Chart(ctx2, { type: "heatmap", data: {} });
+    </script>
+  </body>
+</html>
