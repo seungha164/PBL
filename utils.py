@@ -14,6 +14,12 @@ DF_ACCIDENT = pd.read_csv("files2/refined/accident.csv")
 
 from scipy.stats import gaussian_kde
 
+def get_signal_category(code: int) -> str:
+    return "보행자용" if code == 2 else "차량용"
+
+def get_signal_color(category: str) -> str:
+    return "blue" if category == "보행자용" else "green"
+
 def get_densest_coordinates():
     """
     특정 시군명 내에서 위도/경도가 가장 밀집된 좌표 반환
