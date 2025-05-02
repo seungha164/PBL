@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>남양주시 사고 대시보드</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Chart.js -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- PapaParse -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+  </head>
+  <body class="bg-gray-100 min-h-screen flex flex-col">
+    <!-- 상단 네비게이션 -->
+    <header class="bg-white shadow-md">
+      <div
+        class="container mx-auto px-6 py-4 flex justify-between items-center"
+      >
+        <h1 class="text-2xl font-bold text-gray-800">남양주시 사고 대시보드</h1>
+        <a
+          href="index.html"
+          class="inline-block px-4 py-2 bg-blue-600 text-white font-medium rounded hover:bg-blue-700 transition"
+        >
+          지도로 돌아가기
+        </a>
+      </div>
+    </header>
+
+    <!-- KPI 카드 영역 -->
+    <section
+      class="container mx-auto px-6 mt-6 grid grid-cols-1 sm:grid-cols-3 gap-6"
+    >
+      <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition">
+        <h2 class="text-sm font-medium text-gray-500 uppercase">
+          총 사고 건수
+        </h2>
+        <p id="kpi-total" class="mt-2 text-4xl font-bold text-gray-800">--</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition">
+        <h2 class="text-sm font-medium text-gray-500 uppercase">사망자 수</h2>
+        <p id="kpi-deaths" class="mt-2 text-4xl font-bold text-red-600">--</p>
+      </div>
+      <div class="bg-white p-6 rounded-lg shadow hover:shadow-lg transition">
+        <h2 class="text-sm font-medium text-gray-500 uppercase">부상자 수</h2>
+        <p id="kpi-injuries" class="mt-2 text-4xl font-bold text-yellow-600">
+          --
+        </p>
+      </div>
+    </section>
+
+    <!-- 차트 영역 -->
+    <section
+      class="container mx-auto px-6 mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6 flex-1 pb-12"
+    >
+      <!-- 월별 사고 추이 -->
+      <div class="bg-white p-6 rounded-lg shadow">
+        <h3 class="text-lg font-medium text-gray-700 mb-4">
+          월별 사고 건수 추이
+        </h3>
+        <canvas id="monthlyChart"></canvas>
+      </div>
+      <!-- 시간대별 사고 추이 -->
+      <div class="bg-white p-6 rounded-lg shadow">
+        <h3 class="text-lg font-medium text-gray-700 mb-4">
+          시간대별 사고 건수 추이
+        </h3>
+        <canvas id="hourlyChart"></canvas>
+      </div>
+    </section>
+
+    <script>
+      Papa.parse("accident.csv", {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: ({ data }) => {
+          let total = 0,
+            deaths = 0,
+            injuries = 0;
+          const monthlyCounts = {},
+            hourlyCounts = {};
+
+          data.forEach((r) => {
+            // 경기 남양주시 데이터만
+            if (r["발생지시도"] !== "경기" || r["발생지시군구"] !== "남양주시")
+              return;
+            total++;
+            deaths += r["사망자수"] || 0;
+            injuries += r["부상자수"] || 0;
+
+            // 월 집계
+            const m = r["발생년월일시"]?.slice(0, 7);
+            if (m) monthlyCounts[m] = (monthlyCounts[m] || 0) + 1;
+            // 시각 집계
+            const h = r["발생년월일시"]?.slice(11, 13);
+            if (h) hourlyCounts[h] = (hourlyCounts[h] || 0) + 1;
+          });
+
+          // KPI 업데이트
+          document.getElementById("kpi-total").textContent = total;
+          document.getElementById("kpi-deaths").textContent = deaths;
+          document.getElementById("kpi-injuries").textContent = injuries;
+
+          // 월별 차트 그리기
+          const monthLabels = Object.keys(monthlyCounts).sort();
+          const monthData = monthLabels.map((m) => monthlyCounts[m]);
+          new Chart(document.getElementById("monthlyChart"), {
+            type: "line",
+            data: {
+              labels: monthLabels,
+              datasets: [
+                {
+                  label: "건수",
+                  data: monthData,
+                  borderColor: "#EF4444",
+                  backgroundColor: "rgba(239,68,68,0.1)",
+                  fill: true,
+                  tension: 0.3,
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: { title: { display: true, text: "월 (YYYY-MM)" } },
+                y: {
+                  beginAtZero: true,
+                  title: { display: true, text: "사고 건수" },
+                },
+              },
+            },
+          });
+
+          // 시간대별 차트 그리기
+          const hourLabels = Array.from(
+            { length: 24 },
+            (_, i) => String(i).padStart(2, "0") + "시"
+          );
+          const hourData = hourLabels.map(
+            (h) => hourlyCounts[h.slice(0, 2)] || 0
+          );
+          new Chart(document.getElementById("hourlyChart"), {
+            type: "bar",
+            data: {
+              labels: hourLabels,
+              datasets: [
+                {
+                  label: "건수",
+                  data: hourData,
+                  backgroundColor: "#F59E0B",
+                },
+              ],
+            },
+            options: {
+              responsive: true,
+              scales: {
+                x: { title: { display: true, text: "시간대" } },
+                y: {
+                  beginAtZero: true,
+                  title: { display: true, text: "사고 건수" },
+                },
+              },
+            },
+          });
+        },
+      });
+    </script>
+  </body>
+</html>

@@ -1,0 +1,222 @@
+<!DOCTYPE html>
+<html lang="ko">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>남양주 보행자 안전 통합 대시보드</title>
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Leaflet CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.css"
+    />
+    <!-- MarkerCluster CSS -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"
+    />
+    <!-- AwesomeMarkers & FontAwesome -->
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.css"
+    />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.4/css/all.min.css"
+    />
+    <style>
+      html,
+      body {
+        height: 100%;
+        margin: 0;
+        font-family: "Inter", sans-serif;
+      }
+      /* 사고 클러스터: 붉은 계열 */
+      .marker-cluster-accidents {
+        background-color: rgba(220, 20, 60, 0.6);
+      }
+      .marker-cluster-accidents div {
+        color: white;
+      }
+      /* 보행등 클러스터: 녹색 계열 */
+      .marker-cluster-signals {
+        background-color: rgba(34, 139, 34, 0.6);
+      }
+      .marker-cluster-signals div {
+        color: white;
+      }
+    </style>
+  </head>
+  <body class="flex h-screen bg-gray-100">
+    <!-- 사이드바 -->
+    <aside class="w-64 bg-white shadow-lg p-6 flex flex-col">
+      <h2 class="text-2xl font-semibold mb-6">레이어 컨트롤</h2>
+      <label class="inline-flex items-center mb-4">
+        <input
+          type="checkbox"
+          id="toggle-accidents"
+          class="form-checkbox h-5 w-5 text-red-600 mr-2"
+          checked
+        />
+        <span class="text-lg">사고 시각화</span>
+      </label>
+      <label class="inline-flex items-center">
+        <input
+          type="checkbox"
+          id="toggle-signals"
+          class="form-checkbox h-5 w-5 text-green-600 mr-2"
+          checked
+        />
+        <span class="text-lg">보행등 위치</span>
+      </label>
+      <div class="mt-auto pt-6 border-t">
+        <a
+          href="accident_dashboard.html"
+          class="block text-center bg-blue-500 text-white py-2 rounded hover:bg-blue-600"
+        >
+          통계 페이지 보기
+        </a>
+      </div>
+    </aside>
+
+    <!-- 메인 영역 -->
+    <main class="flex-1 flex flex-col">
+      <!-- 헤더 -->
+      <header
+        class="bg-white shadow-md px-6 py-4 flex justify-between items-center"
+      >
+        <h1 class="text-3xl font-bold text-gray-800">
+          남양주 보행자 안전 통합 대시보드
+        </h1>
+        <nav>
+          <a
+            href="index.html"
+            class="text-gray-600 px-3 py-1 hover:text-gray-900"
+            >지도 보기</a
+          >
+          <a
+            href="accident_dashboard.html"
+            class="text-gray-600 px-3 py-1 hover:text-gray-900"
+            >통계 보기</a
+          >
+        </nav>
+      </header>
+
+      <!-- 맵 -->
+      <div id="map" class="flex-1"></div>
+    </main>
+
+    <!-- JS 라이브러리 -->
+    <script src="https://cdn.jsdelivr.net/npm/leaflet@1.9.3/dist/leaflet.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Leaflet.awesome-markers/2.0.2/leaflet.awesome-markers.js"></script>
+
+    <script>
+      // 1) 맵 초기화 (남양주시 중심)
+      const map = L.map("map").setView([37.6345, 127.1759], 12);
+      L.tileLayer(
+        "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+        { attribution: "© OSM contributors" }
+      ).addTo(map);
+
+      // 2) 아이콘 정의
+      const accidentIcon = L.AwesomeMarkers.icon({
+        markerColor: "red",
+        icon: "car-crash",
+        prefix: "fa",
+        iconColor: "white",
+      });
+      const signalIcon = L.AwesomeMarkers.icon({
+        markerColor: "green",
+        icon: "info-sign",
+        prefix: "glyphicon",
+        iconColor: "white",
+      });
+
+      // 3) 클러스터 레이어 준비
+      const accidentsLayer = L.markerClusterGroup({
+        iconCreateFunction: (c) =>
+          L.divIcon({
+            html: `<div>${c.getChildCount()}</div>`,
+            className: "marker-cluster marker-cluster-accidents",
+            iconSize: L.point(40, 40),
+          }),
+      });
+      const signalsLayer = L.markerClusterGroup({
+        iconCreateFunction: (c) =>
+          L.divIcon({
+            html: `<div>${c.getChildCount()}</div>`,
+            className: "marker-cluster marker-cluster-signals",
+            iconSize: L.point(40, 40),
+          }),
+      });
+
+      // 4) 사고 CSV → accidentsLayer
+      Papa.parse("accident.csv", {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: ({ data }) => {
+          data.forEach((r) => {
+            if (r["위도"] && r["경도"]) {
+              accidentsLayer.addLayer(
+                L.marker([r["위도"], r["경도"]], {
+                  icon: accidentIcon,
+                }).bindPopup(
+                  `<b>발생:</b> ${r["발생년월일시"]}<br>` +
+                    `<b>사고유형:</b> ${r["사고유형"]}<br>`
+                )
+              );
+            }
+          });
+          map.addLayer(accidentsLayer);
+        },
+        error: (err) => console.error("사고 CSV 로딩 에러:", err),
+      });
+
+      // 5) 보행등 CSV → signalsLayer
+      Papa.parse("blinker.csv", {
+        download: true,
+        header: true,
+        dynamicTyping: true,
+        skipEmptyLines: true,
+        complete: ({ data }) => {
+          data.forEach((r) => {
+            if (r["위도"] && r["경도"]) {
+              signalsLayer.addLayer(
+                L.marker([r["위도"], r["경도"]], {
+                  icon: signalIcon,
+                })
+              );
+            }
+          });
+          map.addLayer(signalsLayer);
+        },
+        error: (err) => console.error("보행등 CSV 로딩 에러:", err),
+      });
+
+      // 6) 체크박스 토글
+      document
+        .getElementById("toggle-accidents")
+        .addEventListener("change", (e) => {
+          e.target.checked
+            ? map.addLayer(accidentsLayer)
+            : map.removeLayer(accidentsLayer);
+        });
+      document
+        .getElementById("toggle-signals")
+        .addEventListener("change", (e) => {
+          e.target.checked
+            ? map.addLayer(signalsLayer)
+            : map.removeLayer(signalsLayer);
+        });
+    </script>
+  </body>
+</html>

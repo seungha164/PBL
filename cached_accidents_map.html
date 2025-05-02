@@ -2,7 +2,8 @@
 <html lang="ko">
   <head>
     <meta charset="UTF-8" />
-    <title>보행등 위치 지도</title>
+    <title>사고 발생 지점 지도</title>
+
     <!-- Leaflet CSS -->
     <link
       rel="stylesheet"
@@ -17,6 +18,7 @@
       rel="stylesheet"
       href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/MarkerCluster.Default.css"
     />
+
     <style>
       html,
       body,
@@ -31,6 +33,8 @@
   <body>
     <div id="map"></div>
 
+    <!-- jQuery (팝업 HTML 생성용) -->
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
     <!-- PapaParse (CSV 파싱용) -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <!-- Leaflet JS -->
@@ -39,8 +43,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.markercluster/1.1.0/leaflet.markercluster.js"></script>
 
     <script>
-      // 1) 지도 초기화 (남양주시 중심으로 세팅)
-      var map = L.map("map").setView([37.6345, 127.1759], 12);
+      // 1) 지도 초기화
+      var map = L.map("map").setView([37.5665, 126.978], 12);
       L.tileLayer(
         "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
         {
@@ -52,8 +56,8 @@
       // 2) MarkerClusterGroup 생성
       var markerCluster = L.markerClusterGroup().addTo(map);
 
-      // 3) CSV 파싱 & 보행등 마커 추가 (팝업 없이)
-      Papa.parse("blinker.csv", {
+      // 3) CSV 파싱 & 마커 추가
+      Papa.parse("accident.csv", {
         download: true,
         header: true,
         dynamicTyping: true,
@@ -63,8 +67,17 @@
             var lat = row["위도"],
               lng = row["경도"];
             if (lat && lng) {
-              // 팝업 없이 마커만 생성
               var marker = L.marker([lat, lng]);
+
+              // 부상자 정보 제거: 발생년월일시와 사고유형만 보여줌
+              var popupHtml =
+                "<b>발생년월일시:</b> " +
+                row["발생년월일시"] +
+                "<br>" +
+                "<b>사고유형:</b> " +
+                row["사고유형"];
+
+              marker.bindPopup(popupHtml);
               markerCluster.addLayer(marker);
             }
           });
