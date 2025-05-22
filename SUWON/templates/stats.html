@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>영통구 가로등 통계</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- Tailwind & Google Fonts -->
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-inter">
+
+  <!-- 네비게이션 -->
+  <nav class="bg-white dark:bg-gray-800 shadow">
+    <div class="container mx-auto px-4 py-3 flex justify-between">
+      <h1 class="text-xl font-bold">가로등 통계</h1>
+      <a href="{{ url_for('index') }}"
+         class="text-blue-600 hover:underline">대시보드로 돌아가기</a>
+    </div>
+  </nav>
+  <!-- Container -->
+  <div class="container mx-auto px-4 py-6 space-y-6">
+
+    <!-- KPI 카드 -->
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="bg-gray-100 dark:bg-gray-700 rounded-lg p-4 text-center">
+        <p class="text-sm text-gray-600 dark:text-gray-400">총 가로등 수</p>
+        <p class="text-2xl font-bold">{{ total }}개</p>
+      </div>
+      <div class="bg-green-50 dark:bg-green-900 rounded-lg p-4 text-center">
+        <p class="text-sm text-green-700 dark:text-green-300">정상 가로등</p>
+        <p class="text-2xl font-bold text-green-600 dark:text-green-400">{{ normal }}개</p>
+      </div>
+      <div class="bg-red-50 dark:bg-red-900 rounded-lg p-4 text-center">
+        <p class="text-sm text-red-700 dark:text-red-300">고장 가로등</p>
+        <p class="text-2xl font-bold text-red-600 dark:text-red-400">{{ broken }}개</p>
+      </div>
+      <div class="bg-yellow-50 dark:bg-yellow-900 rounded-lg p-4 text-center">
+        <p class="text-sm text-yellow-700 dark:text-yellow-300">전체 고장율</p>
+        <p class="text-2xl font-bold text-yellow-600 dark:text-yellow-400">
+          {{ '%.1f' % (broken/total*100 if total>0 else 0) }}%
+        </p>
+      </div>
+    </div>
+
+    <!-- 차트 영역 -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <!-- 설치 건수 -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <p class="font-medium mb-2">연도별 설치 건수</p>
+        <canvas id="yearHistChart" class="w-full h-48"></canvas>
+      </div>
+      <!-- 고장율 -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <p class="font-medium mb-2">연도별 고장율 (%)</p>
+        <canvas id="faultRateChart" class="w-full h-48"></canvas>
+      </div>
+      <!-- 상태 분포 -->
+      <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+        <p class="font-medium mb-2">상태 분포</p>
+        <canvas id="statusPieChart" class="w-full h-48"></canvas>
+      </div>
+    </div>
+
+    <!-- 동별 통계 섹션 -->
+    <div class="mt-8">
+          <h2 class="text-xl font-semibold mb-4">영통구 동별 가로등 통계</h2>
+          <!-- 카드 그리드 -->
+          <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-7 gap-4">
+      {% for d in dong_stats|sort(attribute='density', reverse=True) %}
+        {# loop.index 는 1부터 시작합니다 #}
+        {% set is_top3 = loop.index <= 3 %}
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow p-4">
+          {% if is_top3 %}
+            <div class="flex items-center mb-2">
+              <span class="inline-block bg-{{ ['yellow','gray','amber'][loop.index0] }}-300 text-{{ ['yellow','gray','amber'][loop.index0] }}-800 font-bold rounded-full px-2 py-1 text-xs mr-2">
+                {{ loop.index }}위
+              </span>
+              <p class="text-lg font-bold mb-2">{{ d.dong_name }}</p>
+              <!-- <p class="text-sm text-gray-500 dark:text-gray-400">{{ d.dong_name }}</p> -->
+            </div>
+          {% else %}
+            <p class="text-lg font-bold mb-2">{{ d.dong_name }}</p>
+          {% endif %}
+
+          
+
+          <div class="text-sm space-y-1">
+            <div>
+              <span class="font-medium">가로등 수:</span> {{ d.light_count }}개
+            </div>
+            <div>
+              <span class="font-medium">면적:</span> {{ "%.2f"|format(d.area_km2) }} km<sup>2</sup>
+            </div>
+            <div>
+              <span class="font-medium">밀도:</span> {{ "%.1f"|format(d.density) }} 개/km<sup>2</sup>
+            </div>
+          </div>
+        </div>
+      {% endfor %}
+    </div>
+      <!-- 또는 표로 표현하고 싶다면 아래처럼 사용
+      <div class="overflow-x-auto mt-4">
+        <table class="min-w-full bg-white dark:bg-gray-800 rounded-lg">
+          <thead>
+            <tr class="text-left">
+              <th class="px-4 py-2">동 이름</th>
+              <th class="px-4 py-2">가로등 수</th>
+              <th class="px-4 py-2">면적 (km<sup>2</sup>)</th>
+              <th class="px-4 py-2">밀도 (개/km<sup>2</sup>)</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for d in dong_stats %}
+            <tr class="border-t border-gray-200 dark:border-gray-700">
+              <td class="px-4 py-2">{{ d.dong_name }}</td>
+              <td class="px-4 py-2">{{ d.light_count }}</td>
+              <td class="px-4 py-2">{{ "%.3f"|format(d.area_km2) }}</td>
+              <td class="px-4 py-2">{{ "%.1f"|format(d.density) }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </div> -->
+
+  </div>
+
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script>
+        // 연도별 설치 건수
+        const yc = {{ year_counts|tojson }};
+        const yrs = Object.keys(yc), vals = Object.values(yc);
+        new Chart(document.getElementById('yearHistChart'), {
+        type: 'bar', data: { labels: yrs, datasets:[{
+            label:'설치 건수', data:vals,
+            backgroundColor:'rgba(59,130,246,0.6)', borderWidth:1
+        }]}, options:{scales:{y:{beginAtZero:true}}}
+        });
+
+        // 연도별 고장율
+        const fr = {{fault_rate|tojson}};
+        const fyrs = Object.keys(fr), fvals = Object.values(fr);
+        new Chart(document.getElementById('faultRateChart'), {
+        type:'line', data:{ labels:fyrs, datasets:[{
+            label:'고장율 (%)', data:fvals,
+            borderColor:'rgba(239,68,68,0.8)', backgroundColor:'rgba(239,68,68,0.2)', fill:true
+        }]}, options:{scales:{y:{beginAtZero:true}}}
+        });
+
+        // 상태 분포 파이
+        new Chart(document.getElementById('statusPieChart'), {
+        type:'pie', data:{
+            labels:['정상','고장'], datasets:[{
+            data:[{{ normal }},{{ broken }}],
+            backgroundColor:['#10B981','#EF4444']
+            }]
+        }
+        });
+  </script>
+</body>
+</html>

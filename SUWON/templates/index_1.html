@@ -1,0 +1,213 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>영통구 안전 대시보드</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <!-- Tailwind CSS CDN -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <!-- Google Fonts: Inter -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <!-- 커스텀 CSS -->
+    <link href="{{ url_for('static', filename='style.css') }}" rel="stylesheet">
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-gray-100 font-inter transition-colors duration-300">
+    <!-- 로딩 바 -->
+    <div id="loading-bar" class="fixed top-0 left-0 w-full h-1 bg-blue-500 transform scale-x-0 origin-left transition-transform duration-300 hidden"></div>
+
+    <!-- 다크/라이트 모드 토글 버튼 -->
+    <div class="fixed top-4 right-4 z-50">
+        <button id="theme-toggle" class="p-2 rounded-full bg-gray-200 dark:bg-gray-700 hover:bg-gray-300 dark:hover:bg-gray-600 transition">
+            <svg id="theme-icon" class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+            </svg>
+        </button>
+    </div>
+
+    <!-- 네비게이션 바 -->
+    <nav class="bg-white dark:bg-gray-800 shadow-md">
+        <div class="container mx-auto px-4 py-3 flex items-center justify-between">
+            <h1 class="text-xl font-bold">영통구 안전 대시보드</h1>
+            <div class="text-sm text-gray-600 dark:text-gray-400">
+                데이터 기준: 2025-05-22
+            </div>
+        </div>
+    </nav>
+
+    <!-- 메인 콘텐츠 -->
+    <div class="container mx-auto px-4 py-6">
+        <!-- 데이터 요약 카드 -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 mb-6 transform hover:scale-105 transition-transform duration-300">
+            <h2 class="text-lg font-semibold mb-2">가로등 데이터 요약</h2>
+            <a href="{{ url_for('stats') }}"
+                class="inline-block bg-blue-500 hover:bg-blue-700 text-white font-semibold py-2 px-4 rounded">
+                통계 페이지로 이동
+            </a>
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">총 가로등 수</p>
+                    <p class="text-2xl font-bold">{{ total_count }}개</p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">정상 가로등</p>
+                    <p class="text-2xl font-bold text-green-600 dark:text-green-400">
+                        {{ streetlights_df[streetlights_df['status'] == '정상'].shape[0] }}개
+                    </p>
+                </div>
+                <div class="text-center">
+                    <p class="text-sm text-gray-500 dark:text-gray-400">고장 가로등</p>
+                    <p class="text-2xl font-bold text-red-600 dark:text-red-400">
+                        {{ streetlights_df[streetlights_df['status'] == '고장'].shape[0] }}개
+                    </p>
+                </div>
+            </div>
+            <div class="mt-4 text-center">
+                <p class="text-sm text-gray-500 dark:text-gray-400">필터링된 데이터: {{ filtered_count }}개</p>
+            </div>
+        </div>
+
+        <!-- 지도 및 필터링 -->
+        <!-- <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- 필터링 섹션 -->
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <h2 class="text-lg font-semibold mb-4">필터링</h2>
+                <form id="filter-form" method="POST" action="{{ url_for('filter') }}">
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-1">상태</label>
+                        <select name="status" class="w-full p-2 border rounded dark:bg-gray-700 dark:border-gray-600 dark:text-gray-100">
+                            <option value="all" {% if status_filter == 'all' %}selected{% endif %}>모두</option>
+                            <option value="정상" {% if status_filter == '정상' %}selected{% endif %}>정상</option>
+                            <option value="고장" {% if status_filter == '고장' %}selected{% endif %}>고장</option>
+                        </select>
+                    </div>
+                    <div class="mb-4">
+                        <label class="block text-sm font-medium mb-1">설치연도 ({{ year_min_filter }} - {{ year_max_filter }})</label>
+                        <input type="range" name="year_min" min="{{ year_min }}" max="{{ year_max }}" value="{{ year_min_filter }}" class="w-full mb-2" oninput="this.nextElementSibling.value = this.value">
+                        <output>{{ year_min_filter }}</output>
+                        <input type="range" name="year_max" min="{{ year_min }}" max="{{ year_max }}" value="{{ year_max_filter }}" class="w-full mt-2" oninput="this.nextElementSibling.value = this.value">
+                        <output>{{ year_max_filter }}</output>
+                    </div>
+                    <button type="submit" class="w-full bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded transition">필터 적용</button>
+                </form>
+            </div>
+
+            <!-- 지도 -->
+            <div class="md:col-span-2 bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4">
+                <div class="map-container">
+                    {{ map_html | safe }}
+                </div>
+            </div>
+        </div>
+    </div>
+    
+        <!-- 미래 기능 예약 공간 -->
+        <div class="mt-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <h2 class="text-lg font-semibold mb-2">경로 추천 (준비 중)</h2>
+                <p class="text-gray-500 dark:text-gray-400">출발지/목적지 경로 추천 기능이 곧 추가됩니다.</p>
+            </div>
+            <div class="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6">
+                <h2 class="text-lg font-semibold mb-2">통계 (준비 중)</h2>
+                <p class="text-gray-500 dark:text-gray-400">상태 및 설치연도 통계가 곧 추가됩니다.</p>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 다크/라이트 모드 및 로딩 바 스크립트 -->
+    <script>
+        // 다크/라이트 모드 토글
+        const toggleButton = document.getElementById('theme-toggle');
+        const themeIcon = document.getElementById('theme-icon');
+        const html = document.documentElement;
+
+        if (localStorage.getItem('theme') === 'dark') {
+            html.classList.add('dark');
+            themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>';
+        }
+
+        toggleButton.addEventListener('click', () => {
+            html.classList.toggle('dark');
+            if (html.classList.contains('dark')) {
+                localStorage.setItem('theme', 'dark');
+                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"/>';
+            } else {
+                localStorage.setItem('theme', 'light');
+                themeIcon.innerHTML = '<path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"/>';
+            }
+        });
+
+        // 로딩 바 제어
+        const filterForm = document.getElementById('filter-form');
+        const loadingBar = document.getElementById('loading-bar');
+
+        filterForm.addEventListener('submit', () => {
+            loadingBar.classList.remove('hidden');
+            loadingBar.classList.remove('scale-x-0');
+            loadingBar.classList.add('scale-x-100');
+        });
+
+        // 페이지 로드 완료 시 로딩 바 숨김
+        window.addEventListener('load', () => {
+            loadingBar.classList.remove('scale-x-100');
+            loadingBar.classList.add('scale-x-0');
+            setTimeout(() => loadingBar.classList.add('hidden'), 300);
+        });
+    </script>
+    <!-- 차트 렌더링 스크립트 (템플릿 하단에 추가) -->
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        // 1) 연도별 설치 건수 데이터
+        const yearCounts = {{ year_counts|tojson }};
+        const years = Object.keys(yearCounts);
+        const counts = Object.values(yearCounts);
+
+        new Chart(document.getElementById('yearHistChart'), {
+            type: 'bar',
+            data: {
+            labels: years,
+            datasets: [{
+                label: '설치 건수',
+                data: counts,
+                backgroundColor: 'rgba(59,130,246,0.6)',
+                borderWidth: 1
+            }]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+
+        // 2) 연도별 고장율 데이터
+        const faultRate = {{ fault_rate|tojson }};
+        const frYears = Object.keys(faultRate);
+        const frValues = Object.values(faultRate);
+
+        new Chart(document.getElementById('faultRateChart'), {
+            type: 'line',
+            data: {
+            labels: frYears,
+            datasets: [{
+                label: '고장율 (%)',
+                data: frValues,
+                borderColor: 'rgba(239,68,68,0.8)',
+                backgroundColor: 'rgba(239,68,68,0.2)',
+                fill: true
+            }]
+            },
+            options: { scales: { y: { beginAtZero: true } } }
+        });
+
+        // 3) 상태 분포 파이차트
+        const pieData = {
+            labels: ['정상', '고장'],
+            datasets: [{
+            data: [{{ normal }}, {{ broken }}],
+            backgroundColor: ['#10B981','#EF4444']
+            }]
+        };
+        new Chart(document.getElementById('statusPieChart'), {
+            type: 'pie',
+            data: pieData,
+            options: { responsive: true }
+        });
+    </script>
+</body>
+</html>
