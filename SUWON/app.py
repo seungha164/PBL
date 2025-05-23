@@ -2,7 +2,7 @@ from flask import Flask, render_template, render_template, request
 import folium
 import os
 import pandas as pd
-from folium.plugins import MarkerCluster
+from folium.plugins import MarkerCluster, FastMarkerCluster
 import json
 import pandas as pd
 import geopandas as gpd
@@ -13,7 +13,7 @@ from shapely.geometry import Polygon
 
 app = Flask(__name__)
 
-grid = gpd.read_file('/home/nute11a/workspace/PBL/SUWON/code/data/preprocessed/grid_with_lamp_counts.geojson', engine="pyogrio")
+grid = gpd.read_file('/home/nute11a/workspace/PBL/SUWON/code/data/preprocessed/grid_with_score.geojson', engine="pyogrio")
 # 3) (Choropleth 사용) index 필드를 데이터와 매칭하기 위해 reset_index
 # grid = grid.reset_index().rename(columns={"index":"grid_id"})
 # 2) 랜덤 score 생성 (0~1 사이)
@@ -38,15 +38,44 @@ def index():
     
     # 기본 지도 렌더링 (필터 없이 전체 데이터)
     m = folium.Map(location=[37.2983, 127.0355], zoom_start=15)
-    marker_cluster = MarkerCluster().add_to(m)
+    locations = [
+        [
+            row['lat'], 
+            row['lon'],
+            row['status'],
+            f"가로등 {row['id']}: {row['status']}<br>설치연도: {row['install_year']}"
+        ]
+        for _, row in streetlights_df.iterrows()
+    ]
+    icon_callback = """
+    function(row) {
+        var lat = row[0], lon = row[1], status = row[2], popup = row[3];
+        var color = (status === '정상') ? 'green' : 'red';
+        var marker = L.circleMarker([lat, lon], {
+            radius: 6,
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.9
+        });
+        marker.bindPopup(popup);
+        return marker;
+    }
+    """
 
-    for _, row in streetlights_df.iterrows():
-        color = 'green' if row['status'] == '정상' else 'red'
-        folium.Marker(
-            location=[row['lat'], row['lon']],
-            popup=f"가로등 {row['id']}: {row['status']}<br>설치연도: {row['install_year']}",
-            icon=folium.Icon(color=color)
-        ).add_to(marker_cluster)
+    # 4) FastMarkerCluster 적용
+    FastMarkerCluster(
+        data=locations,
+        callback=icon_callback
+    ).add_to(m)
+    # marker_cluster = MarkerCluster().add_to(m)
+
+    # for _, row in streetlights_df.iterrows():
+    #     color = 'green' if row['status'] == '정상' else 'red'
+    #     folium.Marker(
+    #         location=[row['lat'], row['lon']],
+    #         popup=f"가로등 {row['id']}: {row['status']}<br>설치연도: {row['install_year']}",
+    #         icon=folium.Icon(color=color)
+    #     ).add_to(marker_cluster)
 
     # folium.GeoJson(
     #     grid.__geo_interface__,
@@ -64,7 +93,7 @@ def index():
         data=grid,
         columns=["grid_id", "score"],
         key_on="feature.properties.grid_id",
-        fill_color="YlOrRd",      # 색상맵: Yellow→Orange→Red
+        fill_color="RdYlGn",      # 색상맵: Yellow→Orange→Red
         fill_opacity=0.4,
         line_opacity=0.2,
         legend_name="Grid Safety Score"
